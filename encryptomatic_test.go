@@ -165,17 +165,6 @@ func TestCertificateRequestNames(t *testing.T) {
 	}
 }
 
-type getCertificateInstaller struct {
-	Certificate *x509.Certificate
-	Error       error
-
-	Installer
-}
-
-func (t *getCertificateInstaller) GetCertificate(ctx context.Context) (*x509.Certificate, error) {
-	return t.Certificate, t.Error
-}
-
 func TestCertificateRequestShouldRenew(t *testing.T) {
 	ctx := context.Background()
 	shouldRenewBoundary := time.Now().Add(365 * 24 * time.Hour)
@@ -220,14 +209,16 @@ func TestCertificateRequestShouldRenew(t *testing.T) {
 			want:            false,
 		},
 		{
-			name:            "errored",
-			targets:         []Installer{&getCertificateInstaller{Error: fmt.Errorf("eek!")}},
+			name: "errored",
+			targets: []Installer{&testInstaller{
+				ErrorGetCertificate: fmt.Errorf("eek!"),
+			}},
 			renewalBoundary: shouldNotRenewBoundary,
 			wantErr:         true,
 		},
 		{
 			name:            "no certificate",
-			targets:         []Installer{&getCertificateInstaller{}},
+			targets:         []Installer{&testInstaller{}},
 			renewalBoundary: shouldNotRenewBoundary,
 			want:            true,
 		},
@@ -235,8 +226,8 @@ func TestCertificateRequestShouldRenew(t *testing.T) {
 			name:  "certificate mismatch",
 			names: []string{"example.com"},
 			targets: []Installer{
-				&getCertificateInstaller{Certificate: cert1},
-				&getCertificateInstaller{Certificate: cert1b},
+				&testInstaller{Certificate: cert1},
+				&testInstaller{Certificate: cert1b},
 			},
 			renewalBoundary: shouldNotRenewBoundary,
 			want:            true,
@@ -244,7 +235,7 @@ func TestCertificateRequestShouldRenew(t *testing.T) {
 		{
 			name: "certificate with bad names",
 			targets: []Installer{
-				&getCertificateInstaller{Certificate: cert2},
+				&testInstaller{Certificate: cert2},
 			},
 			names:           []string{"example.com"},
 			renewalBoundary: shouldNotRenewBoundary,
@@ -253,7 +244,7 @@ func TestCertificateRequestShouldRenew(t *testing.T) {
 		{
 			name: "certificate expiring",
 			targets: []Installer{
-				&getCertificateInstaller{Certificate: cert1},
+				&testInstaller{Certificate: cert1},
 			},
 			names:           []string{"example.com"},
 			renewalBoundary: shouldRenewBoundary,
@@ -262,7 +253,7 @@ func TestCertificateRequestShouldRenew(t *testing.T) {
 		{
 			name: "certificate up-to-date",
 			targets: []Installer{
-				&getCertificateInstaller{Certificate: cert1},
+				&testInstaller{Certificate: cert1},
 			},
 			names:           []string{"example.com"},
 			renewalBoundary: shouldNotRenewBoundary,

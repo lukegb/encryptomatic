@@ -38,6 +38,14 @@ import (
 
 const (
 	renewalLeeway = 2 * 30 * 24 * time.Hour // 90 day certificates -> renew 60 days before due
+
+	pollTimeout  = 2 * time.Minute
+	pollInterval = 10 * time.Second
+)
+
+var (
+	// variablised so that it can be stubbed out for testing
+	getTXTRecords = net.LookupTXT
 )
 
 // CSRGenerator represents an endpoint which can generate its own certificate request/private key pair.
@@ -204,6 +212,36 @@ func optionsToCombinations(in [][]Verifier) [][]Verifier {
 	return out
 }
 
+func pollUntilReady(ctx context.Context, f func(ctx context.Context) (bool, error)) error {
+	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
+	defer cancel()
+
+	ok, err := f(ctx)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+
+	t := time.NewTicker(pollInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+			ok, err := f(ctx)
+			if err != nil {
+				return err
+			}
+			if ok {
+				return nil
+			}
+		}
+	}
+}
+
 // authorize makes a particular authorization valid, or errors.
 func (e *Encryptomatic) authorize(ctx context.Context, auth *acme.Authorization) (*acme.Authorization, error) {
 	switch auth.Status {
@@ -318,29 +356,23 @@ nextCombo:
 
 				// Poll until TXT record appears, or for 2 minutes.
 				log.Printf("encryptomatic: waiting for TXT record to appear [%d]", n)
-				ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-				defer cancel()
-				t := time.NewTicker(10 * time.Second)
-				defer t.Stop()
-			txtWaitLoop:
-				for {
-					select {
-					case <-ctx.Done():
-						log.Printf("encryptomatic: context failed: %v [%d]", ctx.Err(), n)
-						return ctx.Err()
-					case <-t.C:
-						txts, err := net.LookupTXT(fmt.Sprintf("_acme-challenge.%s", auth.Identifier.Value))
-						if err != nil {
-							return err
-						}
+				err = pollUntilReady(ctx, func(ctx context.Context) (bool, error) {
+					txts, err := getTXTRecords(fmt.Sprintf("_acme-challenge.%s", auth.Identifier.Value))
+					if err != nil {
+						return false, err
+					}
 
-						for _, txt := range txts {
-							if txt == rec {
-								log.Printf("encryptomatic: TXT record appeared [%d]", n)
-								break txtWaitLoop
-							}
+					for _, txt := range txts {
+						if txt == rec {
+							log.Printf("encryptomatic: TXT record appeared [%d]", n)
+							return true, nil
 						}
 					}
+
+					return false, nil
+				})
+				if err != nil {
+					return fmt.Errorf("encryptomatic: failed challenge [%d]: %v", n, err)
 				}
 			default:
 				return fmt.Errorf("can't handle challenge type %q", c.Type)
@@ -354,28 +386,22 @@ nextCombo:
 			}
 
 			log.Printf("encryptomatic: waiting for challenge to change state [%d]", n)
-			t := time.NewTicker(10 * time.Second)
-			defer t.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-t.C:
-					c, err = e.Client.GetChallenge(ctx, c.URI)
-					if err != nil {
-						log.Printf("encryptomatic: GetChallenge failed: %v [%d]", err, n)
-						return err
-					}
-
-					switch c.Status {
-					case acme.StatusInvalid:
-						return fmt.Errorf("server rejected challenge with status invalid")
-					case acme.StatusValid:
-						log.Printf("encryptomatic: challenge -> valid [%d]", n)
-						return nil
-					}
+			return pollUntilReady(ctx, func(ctx context.Context) (bool, error) {
+				c, err = e.Client.GetChallenge(ctx, c.URI)
+				if err != nil {
+					log.Printf("encryptomatic: GetChallenge failed: %v [%d]", err, n)
+					return false, err
 				}
-			}
+
+				switch c.Status {
+				case acme.StatusInvalid:
+					return false, fmt.Errorf("server rejected challenge with status invalid")
+				case acme.StatusValid:
+					log.Printf("encryptomatic: challenge -> valid [%d]", n)
+					return true, nil
+				}
+				return false, nil
+			})
 		})
 	}
 
