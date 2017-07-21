@@ -27,10 +27,8 @@ var (
 )
 
 func init() {
-	DefaultRegistry = &Registry{
-		installers: make(map[string]InstallerFactory),
-		verifiers:  make(map[string]VerifierFactory),
-	}
+	DefaultRegistry = &Registry{}
+	DefaultRegistry.clear()
 }
 
 type InstallerFactory func(v *viper.Viper) (Installer, error)
@@ -39,6 +37,11 @@ type VerifierFactory func(v *viper.Viper) (Verifier, error)
 type Registry struct {
 	installers map[string]InstallerFactory
 	verifiers  map[string]VerifierFactory
+}
+
+func (r *Registry) clear() {
+	r.installers = make(map[string]InstallerFactory)
+	r.verifiers = make(map[string]VerifierFactory)
 }
 
 func (r *Registry) Installer(name string, v *viper.Viper) (Installer, error) {
