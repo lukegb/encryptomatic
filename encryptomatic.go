@@ -133,6 +133,35 @@ func (r CertificateRequest) names() []string {
 	return r.Names
 }
 
+func (r CertificateRequest) shouldRenew(ctx context.Context, renewalBoundary time.Time) (bool, error) {
+	var cert *x509.Certificate
+	// Check whether the certificate is consistent across all the installers.
+	for _, t := range r.Targets {
+		tCert, err := t.GetCertificate(ctx)
+		if err != nil {
+			return false, fmt.Errorf("encryptomatic: failed checking if need to renew %v from %T: %v", r.Names, t, err)
+		}
+		if tCert == nil {
+			log.Printf("encryptomatic: must renew %v: no certificate exists yet!", r.Names)
+			return true, nil
+		}
+		if cert != nil && !tCert.Equal(cert) {
+			return true, nil
+		}
+		cert = tCert
+		certNames := append(append([]string{}, cert.DNSNames...), cert.Subject.CommonName)
+		if !stringSetsMatch(r.Names, certNames) {
+			log.Printf("encryptomatic: must renew: names on cert (%v) do not match requested (%v)", certNames, r.Names)
+			return true, nil
+		}
+		if renewalBoundary.After(cert.NotAfter) {
+			log.Printf("encryptomatic: must renew %v: not after is %v, renewal boundary is %v", r.Names, cert.NotAfter, renewalBoundary)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // Encryptomatic ties together Verifiers, a Client, and CertificateRequests.
 type Encryptomatic struct {
 	// Verifiers is a slice of the available verifiers. They should each implement one of the available verification APIs.
@@ -396,36 +425,9 @@ func (e *Encryptomatic) Request(ctx context.Context, reqs []CertificateRequest) 
 
 		log.Printf("encryptomatic: checking if we need to renew %v", req.Names)
 
-		var cert *x509.Certificate
-		mustRenew := false
-		// Check whether the certificate is consistent across all the installers.
-		for _, t := range req.Targets {
-			tCert, err := t.GetCertificate(ctx)
-			if err != nil {
-				return fmt.Errorf("encryptomatic: failed checking if need to renew %v from %T: %v", req.Names, t, err)
-			}
-			if tCert == nil {
-				log.Printf("encryptomatic: must renew %v: no certificate exists yet!", req.Names)
-				mustRenew = true
-				break
-			}
-			if cert != nil && !tCert.Equal(cert) {
-				log.Printf("encryptomatic: must renew %v: %T has a mismatching certificate", req.Names, t)
-				mustRenew = true
-				break
-			}
-			cert = tCert
-			certNames := append(append([]string{}, cert.DNSNames...), cert.Subject.CommonName)
-			if !stringSetsMatch(req.Names, certNames) {
-				log.Printf("encryptomatic: must renew: names on cert (%v) do not match requested (%v)", req.Names, certNames, req.Names)
-				mustRenew = true
-				break
-			}
-			if renewalBoundary.After(cert.NotAfter) {
-				log.Printf("encryptomatic: must renew %v: not after is %v, renewal boundary is %v", req.Names, cert.NotAfter, renewalBoundary)
-				mustRenew = true
-				break
-			}
+		mustRenew, err := req.shouldRenew(ctx, renewalBoundary)
+		if err != nil {
+			return err
 		}
 
 		if !mustRenew {

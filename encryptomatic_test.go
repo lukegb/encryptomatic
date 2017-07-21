@@ -17,12 +17,16 @@ limitations under the License.
 package encryptomatic
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -157,6 +161,121 @@ func TestCertificateRequestNames(t *testing.T) {
 		gotNames := test.csr.names()
 		if diff := cmp.Diff(gotNames, test.wantNames); diff != "" {
 			t.Errorf("%v: names() returned wrong output: (-got +want)\n%s", test.name, diff)
+		}
+	}
+}
+
+type getCertificateInstaller struct {
+	Certificate *x509.Certificate
+	Error       error
+
+	Installer
+}
+
+func (t *getCertificateInstaller) GetCertificate(ctx context.Context) (*x509.Certificate, error) {
+	return t.Certificate, t.Error
+}
+
+func TestCertificateRequestShouldRenew(t *testing.T) {
+	ctx := context.Background()
+	shouldRenewBoundary := time.Now().Add(365 * 24 * time.Hour)
+	shouldNotRenewBoundary := time.Now().Add(-365 * 24 * time.Hour)
+
+	cert1 := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "example.com",
+		},
+		DNSNames: []string{"example.com"},
+		Raw:      []byte("example.com-certificate"),
+		NotAfter: time.Now(),
+	}
+	cert1b := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "example.com",
+		},
+		DNSNames: []string{"example.com"},
+		Raw:      []byte("other-example.com-certificate"),
+		NotAfter: time.Now(),
+	}
+	cert2 := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "example.net",
+		},
+		DNSNames: []string{"example.net", "example.org"},
+		Raw:      []byte("example.net/org-certificate"),
+		NotAfter: time.Now(),
+	}
+
+	for _, test := range []struct {
+		name            string
+		targets         []Installer
+		names           []string
+		renewalBoundary time.Time
+		want            bool
+		wantErr         bool
+	}{
+		{
+			name:            "no targets",
+			renewalBoundary: shouldNotRenewBoundary,
+			want:            false,
+		},
+		{
+			name:            "errored",
+			targets:         []Installer{&getCertificateInstaller{Error: fmt.Errorf("eek!")}},
+			renewalBoundary: shouldNotRenewBoundary,
+			wantErr:         true,
+		},
+		{
+			name:            "no certificate",
+			targets:         []Installer{&getCertificateInstaller{}},
+			renewalBoundary: shouldNotRenewBoundary,
+			want:            true,
+		},
+		{
+			name:  "certificate mismatch",
+			names: []string{"example.com"},
+			targets: []Installer{
+				&getCertificateInstaller{Certificate: cert1},
+				&getCertificateInstaller{Certificate: cert1b},
+			},
+			renewalBoundary: shouldNotRenewBoundary,
+			want:            true,
+		},
+		{
+			name: "certificate with bad names",
+			targets: []Installer{
+				&getCertificateInstaller{Certificate: cert2},
+			},
+			names:           []string{"example.com"},
+			renewalBoundary: shouldNotRenewBoundary,
+			want:            true,
+		},
+		{
+			name: "certificate expiring",
+			targets: []Installer{
+				&getCertificateInstaller{Certificate: cert1},
+			},
+			names:           []string{"example.com"},
+			renewalBoundary: shouldRenewBoundary,
+			want:            true,
+		},
+		{
+			name: "certificate up-to-date",
+			targets: []Installer{
+				&getCertificateInstaller{Certificate: cert1},
+			},
+			names:           []string{"example.com"},
+			renewalBoundary: shouldNotRenewBoundary,
+			want:            false,
+		},
+	} {
+		cr := CertificateRequest{Targets: test.targets, Names: test.names}
+		got, err := cr.shouldRenew(ctx, test.renewalBoundary)
+		if test.wantErr != (err != nil) {
+			t.Errorf("%s: shouldRenew(ctx, ...): error was %v; wanted error? %v", test.name, err, test.wantErr)
+		}
+		if got != test.want {
+			t.Errorf("%s: shouldRenew(ctx, ...) = %v; want %v", test.name, got, test.want)
 		}
 	}
 }
