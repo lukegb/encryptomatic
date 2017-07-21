@@ -27,8 +27,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"time"
+
+	"github.com/miekg/dns"
 
 	"lukegb.com/encryptomatic/encryptoutil"
 
@@ -42,12 +43,69 @@ const (
 
 var (
 	// variablised so that it can be stubbed out for testing
-	getTXTRecords = net.LookupTXT
+	getTXTRecords = new(dnsClient).lookupTXT
 
 	pollInitialDelay = 100 * time.Millisecond
 	pollTimeout      = 2 * time.Minute
 	pollInterval     = 10 * time.Second
 )
+
+type dnsClient struct {
+	c *dns.Client
+
+	resolver  string
+	authority map[string]string
+}
+
+func (c *dnsClient) lookupTXT(name string) ([]string, error) {
+	if c.resolver == "" {
+		c.resolver = "8.8.8.8:53"
+	}
+	if c.c == nil {
+		c.c = &dns.Client{}
+	}
+	if c.authority == nil {
+		c.authority = make(map[string]string)
+	}
+
+	if _, ok := c.authority[name]; !ok {
+		// Find authority
+		m := &dns.Msg{}
+		m.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+		in, _, err := c.c.Exchange(m, c.resolver)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(in.Ns) == 0 {
+			return nil, fmt.Errorf("SOA contains no records")
+		}
+		soa, ok := in.Ns[0].(*dns.SOA)
+		if !ok {
+			return nil, fmt.Errorf("Server returned %T instead of a SOA record", in.Ns[0])
+		}
+		c.authority[name] = fmt.Sprintf("%s:53", soa.Ns)
+	}
+
+	m := &dns.Msg{}
+	m.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+	m.RecursionDesired = false
+
+	in, _, err := c.c.Exchange(m, c.authority[name])
+	if err != nil {
+		return nil, err
+	}
+
+	var recs []string
+	for _, r := range in.Answer {
+		r, ok := r.(*dns.TXT)
+		if !ok {
+			continue
+		}
+		recs = append(recs, r.Txt...)
+	}
+	return recs, nil
+}
 
 // CSRGenerator represents an endpoint which can generate its own certificate request/private key pair.
 type CSRGenerator interface {
