@@ -123,7 +123,7 @@ func (r CertificateRequest) generateCSR(rand io.Reader) (csr []byte, key crypto.
 	if err != nil {
 		return nil, nil, err
 	}
-	return csr, k, err
+	return csr, k, nil
 }
 
 func (r CertificateRequest) names() []string {
