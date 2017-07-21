@@ -216,3 +216,68 @@ func TestOptionsToCombinations(t *testing.T) {
 		t.Errorf("optionsToCombinations(...) returned wrong output: (-got +want)\n%s", diff)
 	}
 }
+
+func TestStringSetsMatch(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		a, b []string
+		want bool
+	}{
+		{
+			name: "nil == nil",
+			want: true,
+		},
+		{
+			name: "[a] != nil",
+			a:    []string{"a"},
+			want: false,
+		},
+		{
+			name: "[a] == [a]",
+			a:    []string{"a"},
+			b:    []string{"a"},
+			want: true,
+		},
+		{
+			name: "[a b] != [a]",
+			a:    []string{"a", "b"},
+			b:    []string{"a"},
+			want: false,
+		},
+		{
+			name: "[a] != [a b]",
+			a:    []string{"a"},
+			b:    []string{"a", "b"},
+			want: false,
+		},
+		{
+			name: "[a b] == [b a]",
+			a:    []string{"a", "b"},
+			b:    []string{"b", "a"},
+			want: true,
+		},
+		{
+			name: "[a b a c u s] == [a b c s u]",
+			a:    []string{"a", "b", "a", "c", "u", "s"},
+			b:    []string{"a", "b", "c", "s", "u"},
+			want: true,
+		},
+		{
+			name: "[a b a c u s] != [a b c s]",
+			a:    []string{"a", "b", "a", "c", "u", "s"},
+			b:    []string{"a", "b", "c", "s"},
+			want: false,
+		},
+		{
+			name: "[a b a c u s] == [a b c s u u u]",
+			a:    []string{"a", "b", "a", "c", "u", "s"},
+			b:    []string{"a", "b", "c", "s", "u", "u", "u"},
+			want: true,
+		},
+	} {
+		got := stringSetsMatch(test.a, test.b)
+		if got != test.want {
+			t.Errorf("%s: stringSetsMatch(%v, %v) = %v; want %v", test.name, test.a, test.b, got, test.want)
+		}
+	}
+}
