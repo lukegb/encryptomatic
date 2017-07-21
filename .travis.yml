@@ -1,0 +1,8 @@
+dist: trusty
+sudo: false
+
+language: go
+go_import_path: lukegb.com/encryptomatic
+go:
+  - 1.8.x
+  - master
