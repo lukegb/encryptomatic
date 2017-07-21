@@ -130,3 +130,33 @@ func TestCertificateRequestGenerateCSR(t *testing.T) {
 		}
 	}
 }
+
+func TestCertificateRequestNames(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		csr       CertificateRequest
+		wantNames []string
+	}{
+		{
+			name: "from provided CSR",
+			csr: CertificateRequest{
+				Request: &x509.CertificateRequest{
+					DNSNames: []string{"example.net", "example.com", "example.org"},
+				},
+			},
+			wantNames: []string{"example.net", "example.com", "example.org"},
+		},
+		{
+			name: "from .Names",
+			csr: CertificateRequest{
+				Names: []string{"example.com", "example.net", "example.org"},
+			},
+			wantNames: []string{"example.com", "example.net", "example.org"},
+		},
+	} {
+		gotNames := test.csr.names()
+		if diff := cmp.Diff(test.wantNames, gotNames); diff != "" {
+			t.Errorf("%v: names() returned wrong output: (-got +want)\n%s", test.name, diff)
+		}
+	}
+}
