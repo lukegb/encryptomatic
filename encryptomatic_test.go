@@ -188,3 +188,31 @@ func TestTypesForVerifier(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionsToCombinations(t *testing.T) {
+	type uselessVerifier struct {
+		Name string
+		Verifier
+	}
+	v1 := &uselessVerifier{Name: "v1"}
+	v2 := &uselessVerifier{Name: "v2"}
+	v3 := &uselessVerifier{Name: "v3"}
+
+	inp := [][]Verifier{
+		[]Verifier{v2, v3},
+		[]Verifier{v1, v2},
+		[]Verifier{v3},
+	}
+
+	want := [][]Verifier{
+		[]Verifier{v2, v1, v3},
+		[]Verifier{v3, v1, v3},
+		[]Verifier{v2, v2, v3},
+		[]Verifier{v3, v2, v3},
+	}
+
+	got := optionsToCombinations(inp)
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("optionsToCombinations(...) returned wrong output: (-got +want)\n%s", diff)
+	}
+}

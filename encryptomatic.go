@@ -162,14 +162,14 @@ func optionsToCombinations(in [][]Verifier) [][]Verifier {
 
 	// Generate combinations.
 	out := make([][]Verifier, count)
-	for n := 0; n < count; n++ {
-		n := n // Rescope n, since we're modifying it.
+	for combo := 0; combo < count; combo++ {
+		n := combo
 		v := make([]Verifier, len(in))
 		for i, x := range in {
 			v[i] = x[n%len(x)]
 			n /= len(x)
 		}
-		out[n] = v
+		out[combo] = v
 	}
 
 	return out
