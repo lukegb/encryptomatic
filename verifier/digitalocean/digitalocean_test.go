@@ -18,9 +18,7 @@ package digitalocean
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/digitalocean/godo"
 	docontext "github.com/digitalocean/godo/context"
@@ -28,6 +26,7 @@ import (
 	"github.com/spf13/viper"
 
 	"lukegb.com/encryptomatic"
+	"lukegb.com/encryptomatic/base/digitalocean"
 )
 
 const (
@@ -60,15 +59,17 @@ func (s *mockDomainsService) List(ctx docontext.Context, listOpts *godo.ListOpti
 	return []godo.Domain{s.domains[page-1]}, resp, nil
 }
 
-func mockClient() *godo.Client {
-	return &godo.Client{
-		Domains: &mockDomainsService{
-			domains: []godo.Domain{
-				godo.Domain{Name: "example.com", TTL: 120, ZoneFile: "some_zone_file"},
-				godo.Domain{Name: "example.net", TTL: 120, ZoneFile: "some_zone_file"},
-			},
-			rate: godo.Rate{
-				Remaining: 100,
+func mockClient() digitalocean.DigitalOcean {
+	return digitalocean.DigitalOcean{
+		APIClient: &godo.Client{
+			Domains: &mockDomainsService{
+				domains: []godo.Domain{
+					godo.Domain{Name: "example.com", TTL: 120, ZoneFile: "some_zone_file"},
+					godo.Domain{Name: "example.net", TTL: 120, ZoneFile: "some_zone_file"},
+				},
+				rate: godo.Rate{
+					Remaining: 100,
+				},
 			},
 		},
 	}
@@ -81,101 +82,15 @@ func TestRegistersWithVerifier(t *testing.T) {
 	}
 }
 
-func newVerifier(cfg *viper.Viper) (*DigitalOcean, error) {
-	v, err := New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if v, ok := v.(*DigitalOcean); ok {
-		return v, nil
-	}
-	return nil, fmt.Errorf("New returned a %T, not a *DigitalOcean", v)
-}
-
 func TestParsesConfig(t *testing.T) {
 	cfg := exampleConfig()
-	v, err := newVerifier(cfg)
+	v, err := New(cfg)
 	if err != nil {
 		t.Fatalf("New(%v): %v", cfg, err)
 	}
 
-	if v.PersonalAccessToken != testAccessToken {
-		t.Errorf("v.PersonalAccessToken = %q; want %q", v.PersonalAccessToken, testAccessToken)
-	}
-}
-
-func TestWaitForRate(t *testing.T) {
-	v := &DigitalOcean{Client: mockClient()}
-	ctx := context.Background()
-	for _, test := range []struct {
-		name          string
-		context       func() (context.Context, func())
-		lastResp      *godo.Response
-		resetDelay    time.Duration
-		delaysAtLeast time.Duration
-		wantError     bool
-	}{
-		{
-			name:      "no resp",
-			lastResp:  nil,
-			wantError: false,
-		},
-		{
-			name: "resp with remaining",
-			lastResp: &godo.Response{
-				Rate: godo.Rate{Remaining: 1},
-			},
-			wantError: false,
-		},
-		{
-			name:          "resp with reset",
-			lastResp:      &godo.Response{},
-			resetDelay:    10 * time.Millisecond,
-			delaysAtLeast: 10 * time.Millisecond,
-			wantError:     false,
-		},
-		{
-			name:       "cancelled context",
-			lastResp:   &godo.Response{},
-			resetDelay: 10 * time.Millisecond,
-			context: func() (context.Context, func()) {
-				ctx, cancel := context.WithCancel(ctx)
-				cancel()
-				return ctx, func() {}
-			},
-			wantError: true,
-		},
-		{
-			name:       "context deadline too far away",
-			lastResp:   &godo.Response{},
-			resetDelay: 10 * time.Millisecond,
-			context: func() (context.Context, func()) {
-				return context.WithDeadline(ctx, time.Now().Add(5*time.Millisecond))
-			},
-			wantError: true,
-		},
-	} {
-		v.lastResp = test.lastResp
-		if test.resetDelay != 0 {
-			v.lastResp.Rate.Reset = godo.Timestamp{time.Now().Add(test.resetDelay)}
-		}
-		ctx := ctx
-		var cancel func()
-		if test.context != nil {
-			ctx, cancel = test.context()
-		}
-		start := time.Now()
-		err := v.waitForRate(ctx)
-		delay := time.Now().Sub(start)
-		if test.wantError != (err != nil) {
-			t.Errorf("%v: waitForRate(ctx): %v; wanted error? %v", test.name, err, test.wantError)
-		}
-		if test.delaysAtLeast > 0 && delay < test.delaysAtLeast {
-			t.Errorf("%v: waitForRate(ctx): expected a pause of at least %v; got %v", test.name, test.delaysAtLeast, delay)
-		}
-		if cancel != nil {
-			cancel()
-		}
+	if v.Client.PersonalAccessToken != testAccessToken {
+		t.Errorf("v.Client.PersonalAccessToken = %q; want %q", v.Client.PersonalAccessToken, testAccessToken)
 	}
 }
 
