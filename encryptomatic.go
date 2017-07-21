@@ -63,6 +63,23 @@ type Verifier interface {
 	CanVerify(ctx context.Context, name string) (bool, error)
 }
 
+// acmeClient is an internal interface wrapping *acme.Client, used for stubbing out ACME calls during testing.
+type acmeClient interface {
+	// Challenge mungers
+	DNS01ChallengeRecord(token string) (string, error)
+
+	// Challenge-related
+	Accept(ctx context.Context, chal *acme.Challenge) (*acme.Challenge, error)
+	GetChallenge(ctx context.Context, url string) (*acme.Challenge, error)
+
+	// Authorization-related
+	Authorize(ctx context.Context, domain string) (*acme.Authorization, error)
+	WaitAuthorization(ctx context.Context, url string) (*acme.Authorization, error)
+
+	// Certificate-related
+	CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error)
+}
+
 // CertificateRequest describes a request for a single certificate.
 type CertificateRequest struct {
 	// Targets are the target devices which this certificate should be installed on.
@@ -123,7 +140,7 @@ type Encryptomatic struct {
 
 	// Client is the acme.Client to use to retrieve certificates.
 	// It should already have been registered with the directory, and the Terms-of-Service agreed to.
-	Client *acme.Client
+	Client acmeClient
 }
 
 func typesForVerifier(v Verifier) []string {
