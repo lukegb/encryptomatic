@@ -123,7 +123,7 @@ func (i *Installer) GetCertificate(ctx context.Context) (*x509.Certificate, erro
 // SetCertificate applies the provided certificate, private key, and certificate authority bundle to FreeNAS.
 func (i *Installer) SetCertificate(ctx context.Context, caBundle []*x509.Certificate, cert *x509.Certificate, privKey crypto.PrivateKey) error {
 	// Generate the PEM-encoded certificate bundle.
-	pemBundle := encryptoutil.CertificateChainToPEM(caBundle, cert)
+	pemBundle := encryptoutil.CertificateChainToPEM(append(append([]*x509.Certificate{}, caBundle...), cert))
 
 	// Convert privKey into a PEM-encoded private key.
 	pemKey, err := encryptoutil.PrivateKeyToPEM(privKey)

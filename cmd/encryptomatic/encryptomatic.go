@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	_ "lukegb.com/encryptomatic/installer/digitalocean"
 	_ "lukegb.com/encryptomatic/installer/file"
 	_ "lukegb.com/encryptomatic/installer/freenas"
 	_ "lukegb.com/encryptomatic/installer/hpilo2"

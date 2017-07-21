@@ -100,16 +100,12 @@ func PEMToCertificate(pemBytes []byte) (*x509.Certificate, []byte, error) {
 }
 
 // CertificateChainToPEM converts a certificate and its chain into a PEM-encoded slice of bytes.
-func CertificateChainToPEM(caBundle []*x509.Certificate, cert *x509.Certificate) []byte {
-	// Convert cert into a PEM-encoded certificate.
-	pemCert := CertificateToPEM(cert)
-
-	// Convert caBundle into PEM-encoded certificates.
-	certBundle := make([][]byte, len(caBundle)+1)
-	certBundle[0] = pemCert
-	for n, caCert := range caBundle {
-		pemCACert := CertificateToPEM(caCert)
-		certBundle[n+1] = pemCACert
+func CertificateChainToPEM(bundle []*x509.Certificate) []byte {
+	// Convert bundle into PEM-encoded certificates.
+	certBundle := make([][]byte, len(bundle))
+	for n, cert := range bundle {
+		pemCert := CertificateToPEM(cert)
+		certBundle[n] = pemCert
 	}
 
 	return bytes.Join(certBundle, []byte{'\n'})

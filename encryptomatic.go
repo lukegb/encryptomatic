@@ -71,7 +71,7 @@ func (c *dnsClient) lookupTXT(name string) ([]string, error) {
 	if _, ok := c.authority[name]; !ok {
 		// Find authority
 		m := &dns.Msg{}
-		m.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+		m.SetQuestion(dns.Fqdn(name), dns.TypeSOA)
 		in, _, err := c.c.Exchange(m, c.resolver)
 		if err != nil {
 			return nil, err
