@@ -27,7 +27,9 @@ import (
 	_ "lukegb.com/encryptomatic/installer/freenas"
 	_ "lukegb.com/encryptomatic/installer/hpilo2"
 	_ "lukegb.com/encryptomatic/installer/ssh"
+
 	_ "lukegb.com/encryptomatic/verifier/cloudflare"
+	_ "lukegb.com/encryptomatic/verifier/digitalocean"
 )
 
 func main() {
