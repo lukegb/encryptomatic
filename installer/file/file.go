@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package file installs certificates into flat files on disk.
-package file
+package file // import "lukegb.com/encryptomatic/installer/file"
 
 import (
 	"context"

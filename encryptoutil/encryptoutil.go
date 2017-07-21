@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package encryptoutil provides some useful X.509 utilities.
-package encryptoutil
+package encryptoutil // import "lukegb.com/encryptomatic/encryptoutil"
 
 import (
 	"bytes"

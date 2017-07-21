@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package freenas installs certificates on a FreeNAS 11 server.
-package freenas
+package freenas // import "lukegb.com/encryptomatic/installer/freenas"
 
 import (
 	"bytes"

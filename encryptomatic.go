@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package encryptomatic handles granting SSL certificates via ACME to devices which may not natively support that.
-package encryptomatic
+package encryptomatic // import "lukegb.com/encryptomatic"
 
 import (
 	"context"

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package cloudflare automates verification of domain control using Cloudflare's API.
-package cloudflare
+package cloudflare // import "lukegb.com/encryptomatic/verifier/cloudflare"
 
 import (
 	"context"

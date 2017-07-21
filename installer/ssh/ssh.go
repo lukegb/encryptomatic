@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package ssh installs certificates into flat files on a remote host, using SSH/SCP.
-package ssh
+package ssh // import "lukegb.com/encryptomatic/installer/ssh"
 
 import (
 	"context"

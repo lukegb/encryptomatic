@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package hpilo2 allows installation of SSL certificates on HP ILO2 machines.
-package hpilo2
+package hpilo2 // import "lukegb.com/encryptomatic/installer/hpilo2"
 
 import (
 	"bytes"
