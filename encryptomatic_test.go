@@ -155,8 +155,36 @@ func TestCertificateRequestNames(t *testing.T) {
 		},
 	} {
 		gotNames := test.csr.names()
-		if diff := cmp.Diff(test.wantNames, gotNames); diff != "" {
+		if diff := cmp.Diff(gotNames, test.wantNames); diff != "" {
 			t.Errorf("%v: names() returned wrong output: (-got +want)\n%s", test.name, diff)
+		}
+	}
+}
+
+func TestTypesForVerifier(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		v    Verifier
+		want []string
+	}{
+		{
+			name: "useless verifier",
+			v: struct {
+				Verifier
+			}{},
+			want: nil,
+		},
+		{
+			name: "DNS-01 verifier",
+			v: struct {
+				VerifierDNS01
+			}{},
+			want: []string{"dns-01"},
+		},
+	} {
+		got := typesForVerifier(test.v)
+		if diff := cmp.Diff(got, test.want); diff != "" {
+			t.Errorf("%v: typesForVerifier(%+v) returned wrong output: (-got +want)\n%s", test.name, test.v, diff)
 		}
 	}
 }
