@@ -38,14 +38,15 @@ import (
 
 const (
 	renewalLeeway = 2 * 30 * 24 * time.Hour // 90 day certificates -> renew 60 days before due
-
-	pollTimeout  = 2 * time.Minute
-	pollInterval = 10 * time.Second
 )
 
 var (
 	// variablised so that it can be stubbed out for testing
 	getTXTRecords = net.LookupTXT
+
+	pollInitialDelay = 100 * time.Millisecond
+	pollTimeout      = 2 * time.Minute
+	pollInterval     = 10 * time.Second
 )
 
 // CSRGenerator represents an endpoint which can generate its own certificate request/private key pair.
@@ -215,6 +216,8 @@ func optionsToCombinations(in [][]Verifier) [][]Verifier {
 func pollUntilReady(ctx context.Context, f func(ctx context.Context) (bool, error)) error {
 	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
 	defer cancel()
+
+	time.Sleep(pollInitialDelay)
 
 	ok, err := f(ctx)
 	if err != nil {

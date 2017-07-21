@@ -391,3 +391,31 @@ func TestStringSetsMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestPollUntilReadyContextCanceled(t *testing.T) {
+	ctx := context.Background()
+	cctx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	err := pollUntilReady(cctx, func(ctx context.Context) (bool, error) {
+		return false, nil
+	})
+	if err != cctx.Err() {
+		t.Errorf("pollUntilReady: %v (want %v)", err, cctx.Err())
+	}
+}
+
+func TestPollUntilReady(t *testing.T) {
+	// TODO(lukegb): use github.com/mixer/clock here instead of this hack
+	pollInterval = 10 * time.Millisecond
+	needCalls := 3
+	ctx := context.Background()
+
+	err := pollUntilReady(ctx, func(ctx context.Context) (bool, error) {
+		needCalls--
+		return needCalls == 0, nil
+	})
+	if err != nil {
+		t.Errorf("pollUntilReady: %v", err)
+	}
+}
