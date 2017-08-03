@@ -278,6 +278,7 @@ func (i *Installer) GetCertificate(ctx context.Context) (*x509.Certificate, erro
 		return nil, fmt.Errorf("ssh: failed to connect: %v", err)
 	}
 
+	var cert *x509.Certificate
 	candidatePaths := []string{i.FullChain, i.EndEntity, i.FullPrivateChain}
 	for _, p := range candidatePaths {
 		if p == "" {
@@ -297,15 +298,20 @@ func (i *Installer) GetCertificate(ctx context.Context) (*x509.Certificate, erro
 			return nil, fmt.Errorf("ssh: couldn't read %v: %v", p, err)
 		}
 
-		cert, _, err := encryptoutil.PEMToCertificate(pemBytes)
+		thisCert, _, err := encryptoutil.PEMToCertificate(pemBytes)
 		if err != nil {
 			return nil, fmt.Errorf("ssh: %v contains garbage: %v", p, err)
 		}
 		log.Printf("ssh: found certificate at %v", p)
-		return cert, nil
+
+		if cert != nil && !cert.Equal(thisCert) {
+			log.Printf("ssh: certificate mismatch, forcing renewal")
+			return nil, nil
+		}
+		cert = thisCert
 	}
 
-	return nil, nil
+	return cert, nil
 }
 
 // SetCertificate installs the provided certificate into the provided files.
