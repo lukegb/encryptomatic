@@ -13,7 +13,9 @@ installing certificates on the local disk and on remote machines.
 * Remote server via SSH (`ssh`)
 * FreeNAS (`freenas`)
 * HP ILO2 (`hpilo2`)
+* DigitalOcean LoadBalancers (`digitalocean`)
 
 ## Supported Domain Control Verification Methods
 
 * Cloudflare DNS (`cloudflare`)
+* DigitalOcean DNS (`digitalocean`)
